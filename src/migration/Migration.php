@@ -48,7 +48,7 @@ class Migration
 
         $file = require $migration;
 
-        dd($file->handle());
+        dd($file->getQuery());
 
 
     }

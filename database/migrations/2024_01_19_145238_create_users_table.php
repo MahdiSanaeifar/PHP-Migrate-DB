@@ -1,13 +1,11 @@
 <?php
 
-return new Class {
+use Migration\MigrationInterface;
+
+return new Class extends MigrationInterface {
 
     public function handle() {
-
-
-
-
-        return "Some Vlaue";
+        return "Some Value222";
     }
 
 
