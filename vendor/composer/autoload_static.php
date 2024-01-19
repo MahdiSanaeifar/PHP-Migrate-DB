@@ -11,12 +11,20 @@ class ComposerStaticInit53c1f702fe5e74eb72f7afb5eb3d2b66
         array (
             'Migration\\' => 10,
         ),
+        'D' => 
+        array (
+            'DBConnection\\' => 13,
+        ),
     );
 
     public static $prefixDirsPsr4 = array (
         'Migration\\' => 
         array (
-            0 => __DIR__ . '/../..' . '/src/migration',
+            0 => __DIR__ . '/../..' . '/src/Migration',
+        ),
+        'DBConnection\\' => 
+        array (
+            0 => __DIR__ . '/../..' . '/src/DBConnection',
         ),
     );
 

@@ -6,5 +6,6 @@ $vendorDir = dirname(__DIR__);
 $baseDir = dirname($vendorDir);
 
 return array(
-    'Migration\\' => array($baseDir . '/src/migration'),
+    'Migration\\' => array($baseDir . '/src/Migration'),
+    'DBConnection\\' => array($baseDir . '/src/DBConnection'),
 );

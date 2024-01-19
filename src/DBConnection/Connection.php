@@ -20,25 +20,20 @@ class Connection
     {
     }
 
-    public static function getDBConnectionInstance()
+    public static function getDBConnectionInstance($host , $dbname, $user, $pass)
     {
 
         if (self::$dbConnectionInstance == null) {
             $DBConnectionInstance = new Connection();
-            self::$dbConnectionInstance = $DBConnectionInstance->dbConnection();
+            self::$dbConnectionInstance = $DBConnectionInstance->dbConnection($host , $dbname, $user, $pass);
         }
 
         return self::$dbConnectionInstance;
     }
 
-    private function dbConnection()
+    private function dbConnection($host , $dbname, $user, $pass)
     {
         $options = $this->options ?? [];
-
-        $host = "localhost";
-        $dbname = "ma_example";
-        $user = "root";
-        $pass = "mahdi";
 
         try {
             return new PDO("mysql:host=" . $host . ";dbname=" . $dbname, $user, $pass, $options);
