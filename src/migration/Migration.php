@@ -5,11 +5,12 @@ namespace Migration;
 use DBConnection\Connection;
 use Exception;
 use InvalidArgumentException;
+use Migration\Traits\HasDatabaseConnection;
 use Migration\Traits\HasVersionControl;
 
 class Migration
 {
-    use HasVersionControl;
+    use HasVersionControl, HasDatabaseConnection;
     
     /**
      * The name of the migrations table in the database.
@@ -47,44 +48,11 @@ class Migration
     private $migrationBatch;
 
     /**
-     * Database connection parameters.
-     *
-     * @var string
-     */
-    private $connectionHost;
-    private $connectionDB;
-    private $connectionUser;
-    private $connectionPass;
-
-    /**
-     * PDO instance for database connection.
-     *
-     * @var \PDO
-     */
-    private $pdoInstance;
-
-    /**
      * Constructor for the Migration class.
      */
     public function __construct()
     {
         $this->migrationTable = "migrations";
-    }
-
-    /**
-     * Set the database connection parameters.
-     *
-     * @param string $host
-     * @param string $dbname
-     * @param string $user
-     * @param string $pass
-     */
-    public function setConnection($host, $dbname, $user, $pass)
-    {
-        $this->connectionHost = $host;
-        $this->connectionDB = $dbname;
-        $this->connectionUser = $user;
-        $this->connectionPass = $pass;
     }
 
     /**
@@ -225,7 +193,6 @@ class Migration
                 `batch` = '{$migrationBatch}'
         ");
     }
-
 
     /**
      * Get the current migration batch ID.
