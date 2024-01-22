@@ -32,7 +32,7 @@ define('DOCUMENT_ROOT', __DIR__ . DIRECTORY_SEPARATOR . "database" . DIRECTORY_S
 $migration = new Migration();
 
 // Set the database connection parameters
-$migration->setConnection("localhost", "pakage_test", "root", "mahdi");
+$migration->setConnection("localhost", "db", "user", "password");
 
 // Set the migration directory
 $migration->setMigrationDirectory(DOCUMENT_ROOT);
