@@ -8,7 +8,7 @@ A PHP package for managing database migrations.
 
 Install the package using Composer:
 
-composer require your-username/migration-package
+composer require mahdisanaeifar/php-migrate-db
 
 ## Quick Start
 ```php
