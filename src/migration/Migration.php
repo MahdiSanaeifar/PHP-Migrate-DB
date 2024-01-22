@@ -5,113 +5,164 @@ namespace Migration;
 use DBConnection\Connection;
 use Exception;
 use InvalidArgumentException;
+use Migration\Traits\HasVersionControl;
 
 class Migration
 {
+    use HasVersionControl;
+    
+    /**
+     * The name of the migrations table in the database.
+     *
+     * @var string
+     */
+    private $migrationTable;
 
+    /**
+     * The path to the directory containing migration files.
+     *
+     * @var string
+     */
     private $migrationsDirectory;
 
+    /**
+     * Array to store SQL queries for a specific migration file.
+     *
+     * @var array
+     */
     private $sqlMigrationArray = [];
 
+    /**
+     * Array to store names of migrated files.
+     *
+     * @var array
+     */
     private $migratedFileArray = [];
 
+    /**
+     * The migration batch ID.
+     *
+     * @var int
+     */
     private $migrationBatch;
 
+    /**
+     * Database connection parameters.
+     *
+     * @var string
+     */
     private $connectionHost;
     private $connectionDB;
     private $connectionUser;
     private $connectionPass;
 
-    private $migrationTable;
+    /**
+     * PDO instance for database connection.
+     *
+     * @var \PDO
+     */
     private $pdoInstance;
 
-
-
-
+    /**
+     * Constructor for the Migration class.
+     */
     public function __construct()
     {
         $this->migrationTable = "migrations";
     }
 
+    /**
+     * Set the database connection parameters.
+     *
+     * @param string $host
+     * @param string $dbname
+     * @param string $user
+     * @param string $pass
+     */
     public function setConnection($host, $dbname, $user, $pass)
     {
-
         $this->connectionHost = $host;
         $this->connectionDB = $dbname;
         $this->connectionUser = $user;
         $this->connectionPass = $pass;
-
     }
 
-    private function setOldMigrationArray()
-    {
-
-
-        $result = $this->query("SELECT GROUP_CONCAT() FORM ");
-
-        // id
-        // file
-        // group
-
-
-    }
-
+    /**
+     * Set the directory path where migration files are located.
+     *
+     * @param string $path
+     */
     public function setMigrationDirectory($path)
     {
         $this->migrationsDirectory = rtrim($path, "\/");
     }
 
-    public function getMigrationsDirectory()
+    /**
+     * Get the migrations directory path.
+     *
+     * @return string
+     */
+    private function getMigrationsDirectory()
     {
-
         return $this->migrationsDirectory;
     }
 
-    public function getAllMigrations()
+    /**
+     * Get an array containing all migration file paths in the specified directory.
+     *
+     * @return array
+     */
+    private function getAllMigrations()
     {
-
         $migrationsDirectory = $this->getMigrationsDirectory();
         $allMigrationsArray = glob($migrationsDirectory . DIRECTORY_SEPARATOR . "*.php");
 
         return $allMigrationsArray;
     }
 
-    public function runAllMigrations()
+    /**
+     * Run all migrations found in the specified directory.
+     */
+    private function runAllMigrations()
     {
-
         $migrations = $this->getAllMigrations();
 
         foreach ($migrations as $migration) {
-
             $this->runSpecificFileMigration($migration);
         }
     }
 
+    /**
+     * Check if a migration has already been executed based on the migration file name.
+     *
+     * @param string $migration
+     * @return bool
+     */
     private function checkIsMigrationAlreadyExecuted($migration): bool
     {
-
         $migrationsDirectory = $this->getMigrationsDirectory() . DIRECTORY_SEPARATOR;
         $migratedFileArray = $this->getMigratedFileArray();
 
         $migrationFileName = str_replace($migrationsDirectory, "", $migration);
 
-        if (in_array($migrationFileName, $migratedFileArray)) {
-            return true;
-        }
-
-        return false;
+        return in_array($migrationFileName, $migratedFileArray);
     }
 
-    public function runSpecificFileMigration($migration)
+    /**
+     * Run migration for a specific file.
+     *
+     * @param string $migration
+     * @throws InvalidArgumentException
+     * @throws Exception
+     */
+    private function runSpecificFileMigration($migration)
     {
-
-        // check migration not run previously
+        // Check if migration has already been executed
         if ($this->checkIsMigrationAlreadyExecuted($migration)) {
             return true;
         }
 
         $this->clearMigrationSql();
-
 
         if (!file_exists($migration)) {
             throw new InvalidArgumentException("Migration file not exists on path: {$migration}.");
@@ -130,7 +181,6 @@ class Migration
 
         $migrationSql = $this->getMigrationSql();
 
-
         $pdoInstance = Connection::getDBConnectionInstance(
             $this->connectionHost,
             $this->connectionDB,
@@ -138,28 +188,33 @@ class Migration
             $this->connectionPass
         );
 
-        // start transaction
-        // $pdoInstance->exec("SET AUTOCOMMIT = 0;");
+        try {
+            // Start a transaction
+            $pdoInstance->beginTransaction();
 
-        foreach ($migrationSql as $sql) {
+            foreach ($migrationSql as $sql) {
+                if (empty($sql)) {
+                    continue;
+                }
 
-            if (empty($sql))
-                continue;
-
-            try {
-
+                // Execute the SQL query
                 $pdoInstance->exec($sql);
-
-            } catch (Exception $e) {
-
-                // $pdoInstance->exec("ROLLBACK;");
-                // $pdoInstance->exec("SET AUTOCOMMIT = 1;");
-                throw new Exception("There is an error accord on running migration on file {$migration} - sql {$sql} - error ({$e->getMessage()}), This migration not saved!.");
             }
-            
+
+            // Commit the transaction if all queries succeed
+            if ($pdoInstance->inTransaction()) {
+                $pdoInstance->commit();
+            }
+        } catch (Exception $e) {
+            // Rollback the transaction in case of an error
+            if ($pdoInstance->inTransaction()) {
+                $pdoInstance->rollBack();
+            }
+
+            throw new Exception("There is an error according to running migration on file {$migration} - error ({$e->getMessage()}), This migration not saved!.");
         }
 
-        // insert new migration record
+        // Insert new migration record
         $migrationsDirectory = $this->getMigrationsDirectory() . DIRECTORY_SEPARATOR;
         $migrationBatch = $this->getMigrationBatch();
         $migrationFileName = str_replace($migrationsDirectory, "", $migration);
@@ -169,22 +224,32 @@ class Migration
                 `migration` = '{$migrationFileName}',
                 `batch` = '{$migrationBatch}'
         ");
-
-        // end transaction
-        // $pdoInstance->exec("COMMIT;");
-        // $pdoInstance->exec("SET AUTOCOMMIT = 1;");
     }
 
+
+    /**
+     * Get the current migration batch ID.
+     *
+     * @return int
+     */
     private function getMigrationBatch()
     {
         return $this->migrationBatch;
     }
 
+    /**
+     * Clear the SQL migration array.
+     */
     private function clearMigrationSql()
     {
         $this->sqlMigrationArray = [];
     }
 
+    /**
+     * Push a SQL migration query into the array.
+     *
+     * @param string $sql
+     */
     private function pushMigrationSql($sql)
     {
         if (!in_array($sql, $this->sqlMigrationArray)) {
@@ -192,30 +257,37 @@ class Migration
         }
     }
 
+    /**
+     * Get the array containing SQL migration queries.
+     *
+     * @return array
+     */
     private function getMigrationSql()
     {
         return $this->sqlMigrationArray;
     }
 
+    /**
+     * Run migrations for specified files or run all migrations if no files are provided.
+     *
+     * @param string ...$files
+     */
     public function run(...$files)
     {
-
         $files = array_unique($files);
 
-
-        // check migration table exists
+        // Check if the migrations table exists, create it if not
         if (!$this->checkIsMigrationsTableExists()) {
             $this->createMigrationsTable();
         }
 
-        // set migration batch id for this migration
+        // Set migration batch ID for this migration
         $this->setMigrationBatch();
 
-
-        // set migrated files array
+        // Set migrated files array
         $this->setMigratedFileArray();
 
-
+        // Run all migrations or specific files
         if (empty($files)) {
             $this->runAllMigrations();
         } else {
@@ -227,9 +299,11 @@ class Migration
         }
     }
 
+    /**
+     * Set the array of migrated file names.
+     */
     private function setMigratedFileArray()
     {
-
         $result = $this->query("SELECT GROUP_CONCAT(`migration`) as migrations FROM migrations")->fetch();
 
         $migratedFilesArray = [];
@@ -240,14 +314,21 @@ class Migration
         $this->migratedFileArray = $migratedFilesArray;
     }
 
+    /**
+     * Get the array of migrated file names.
+     *
+     * @return array
+     */
     private function getMigratedFileArray()
     {
         return $this->migratedFileArray;
     }
 
+    /**
+     * Set the migration batch ID.
+     */
     private function setMigrationBatch()
     {
-
         $result = $this->query("SELECT MAX(`batch`) as max_batch FROM migrations")->fetch();
 
         $batch = (int)$result['max_batch'] + 1;
@@ -255,6 +336,11 @@ class Migration
         $this->migrationBatch = $batch;
     }
 
+    /**
+     * Check if the migrations table exists in the database.
+     *
+     * @return bool
+     */
     private function checkIsMigrationsTableExists()
     {
         $result = $this->query("
@@ -265,15 +351,17 @@ class Migration
             LIMIT 1;
         ")->fetchAll();
 
-        if ($result)
-            return true;
-
-        return false;
+        return !empty($result);
     }
 
+    /**
+     * Execute a query on the database.
+     *
+     * @param string $query
+     * @return \PDOStatement
+     */
     private function query($query)
     {
-
         $pdoInstance = Connection::getDBConnectionInstance(
             $this->connectionHost,
             $this->connectionDB,
@@ -287,9 +375,11 @@ class Migration
         return $statement;
     }
 
-    public function createMigrationsTable()
+    /**
+     * Create the migrations table in the database.
+     */
+    private function createMigrationsTable()
     {
-
         $result = $this->query("
             START TRANSACTION;
                 CREATE TABLE `migrations` (
@@ -303,7 +393,12 @@ class Migration
         ");
     }
 
-    public function createNewMigration($name = "migration")
+    /**
+     * Create a new migration file with the provided name.
+     *
+     * @param string $name
+     */
+    public function newMigration($name = "")
     {
         $migrationsDirectory = $this->getMigrationsDirectory();
         $fileName = date("Y_m_d_His") . "_" . str_replace(' ', '-', (string)$name) . ".php";
@@ -318,21 +413,30 @@ class Migration
         fclose($file);
     }
 
+    /**
+     * Get the code template for a new migration file.
+     *
+     * @return string
+     */
     private function getMigrationFileCode()
     {
-
-        return "<?php
-
-    use Migration\MigrationInterface;
-
-    return new class extends MigrationInterface
-    {        
-        public function handle()
-        {
-            return [];
-        }
-    };
-
-?>";
+        $template = <<<'EOT'
+            <?php
+            
+            use Migration\MigrationInterface;
+            
+            return new class extends MigrationInterface
+            {        
+                public function handle()
+                {
+                    return [];
+                }
+            };
+            
+            ?>
+        EOT;
+    
+        return $template;
     }
+    
 }
